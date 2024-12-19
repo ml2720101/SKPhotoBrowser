@@ -31,10 +31,32 @@ static int delayCentisecondsForImageAtIndex(CGImageSourceRef const source, size_
     return delayCentiseconds;
 }
 
+static NSInteger orientationForImageAtIndex(CGImageSourceRef const source, size_t const i) {
+    NSInteger orientationValue = 0;
+    CFDictionaryRef const properties = CGImageSourceCopyPropertiesAtIndex(source, i, NULL);
+    if (properties) {
+        CFDictionaryRef const gifProperties = CFDictionaryGetValue(properties, kCGImagePropertyGIFDictionary);
+        CFTypeRef value = NULL;
+        value = CFDictionaryGetValue(properties, kCGImagePropertyOrientation);
+        if (value) {
+            CFNumberGetValue(value, kCFNumberNSIntegerType, &orientationValue);
+            orientationValue = orientationFromPropertyValue(orientationValue);
+        }
+        CFRelease(properties);
+    }
+    return orientationValue;
+}
+
 static void createImagesAndDelays(CGImageSourceRef source, size_t count, CGImageRef imagesOut[count], int delayCentisecondsOut[count]) {
     for (size_t i = 0; i < count; ++i) {
         imagesOut[i] = CGImageSourceCreateImageAtIndex(source, i, NULL);
         delayCentisecondsOut[i] = delayCentisecondsForImageAtIndex(source, i);
+    }
+}
+
+static void createImagesOrientation(CGImageSourceRef source, size_t count, UIImageOrientation orientations[count]) {
+    for (size_t i = 0; i < count; ++i) {
+        orientations[i] = orientationForImageAtIndex(source, i);
     }
 }
 
@@ -67,12 +89,13 @@ static int vectorGCD(size_t const count, int const *const values) {
     return gcd;
 }
 
-static NSArray *frameArray(size_t const count, CGImageRef const images[count], int const delayCentiseconds[count], int const totalDurationCentiseconds) {
+static NSArray *frameArray(size_t const count, CGImageRef const images[count], int const delayCentiseconds[count], int const totalDurationCentiseconds, UIImageOrientation const orientations[count]) {
     int const gcd = vectorGCD(count, delayCentiseconds);
     size_t const frameCount = totalDurationCentiseconds / gcd;
     UIImage *frames[frameCount];
     for (size_t i = 0, f = 0; i < count; ++i) {
-        UIImage *const frame = [UIImage imageWithCGImage:images[i]];
+//        UIImage *const frame = [UIImage imageWithCGImage:images[i]];
+        UIImage *const frame = [UIImage imageWithCGImage:images[i] scale:1 orientation:orientations[i]];
         for (size_t j = delayCentiseconds[i] / gcd; j > 0; --j) {
             frames[f++] = frame;
         }
@@ -86,13 +109,38 @@ static void releaseImages(size_t const count, CGImageRef const images[count]) {
     }
 }
 
+static UIImageOrientation orientationFromPropertyValue(NSInteger value) {
+    switch (value) {
+        case 1:
+            return UIImageOrientationUp;
+        case 3:
+            return UIImageOrientationDown;
+        case 8:
+            return UIImageOrientationLeft;
+        case 6:
+            return UIImageOrientationRight;
+        case 2:
+            return UIImageOrientationUpMirrored;
+        case 4:
+            return UIImageOrientationDownMirrored;
+        case 5:
+            return UIImageOrientationLeftMirrored;
+        case 7:
+            return UIImageOrientationRightMirrored;
+        default:
+            return UIImageOrientationUp;
+    }
+}
+
 static UIImage *animatedImageWithAnimatedGIFImageSource(CGImageSourceRef const source) {
     size_t const count = CGImageSourceGetCount(source);
     CGImageRef images[count];
     int delayCentiseconds[count]; // in centiseconds
+    UIImageOrientation orientations[count];
     createImagesAndDelays(source, count, images, delayCentiseconds);
+    createImagesOrientation(source, count, orientations);
     int const totalDurationCentiseconds = sum(count, delayCentiseconds);
-    NSArray *const frames = frameArray(count, images, delayCentiseconds, totalDurationCentiseconds);
+    NSArray *const frames = frameArray(count, images, delayCentiseconds, totalDurationCentiseconds, orientations);
     UIImage *const animation = [UIImage animatedImageWithImages:frames duration:(NSTimeInterval)totalDurationCentiseconds / 100.0];
     releaseImages(count, images);
     return animation;
