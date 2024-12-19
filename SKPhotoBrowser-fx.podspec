@@ -1,5 +1,5 @@
 Pod::Spec.new do |s|
-  s.name                = "SKPhotoBrowser"
+  s.name                = "SKPhotoBrowser-fx"
   s.version             = "1.0.0"
   s.summary             = "Simple PhotoBrowser/Viewer iwritten by pure swift. inspired by facebook, twitter photo browsers."
   s.homepage            = "https://github.com/ml2720101/SKPhotoBrowser"
